@@ -144,3 +144,108 @@ function exploreFiles(param) {
             }
         });
 }
+
+
+// Enhanced chart display for ML reports - Added by Akhil
+function displayCharts(param) {
+    if (param.showother && window.location.origin.indexOf('github') < 0) {
+        param.owner = 'modelearth';
+        param.repo = 'reports';
+        param.branch = 'main';
+    }
+
+    let owner = param.owner || 'akhilaguska27';
+    let repo = param.repo || 'reports';
+    let branch = param.branch || 'main';
+
+    // Get current path from URL
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    let currentFolder = pathParts.slice(1).join('/'); // Skip repo name for GitHub Pages
+
+    console.log('Looking for charts in folder:', currentFolder);
+
+    $.ajax({
+        url: `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`,
+        method: 'GET',
+        success: function(data) {
+            console.log('GitHub API response:', data);
+            
+            // Filter PNG files in current folder
+            const pngFiles = data.tree.filter(file => {
+                if (!/\.png$/i.test(file.path)) return false;
+                const fileFolder = file.path.substring(0, file.path.lastIndexOf('/'));
+                return fileFolder === currentFolder;
+            });
+
+            console.log('Found PNG files:', pngFiles);
+
+            if (pngFiles.length === 0) {
+                $('#exploreOutput').append('<p>No chart images found in this folder.</p>');
+                return;
+            }
+
+            // Display header
+            $('#exploreOutput').append(`
+                <style>
+                    .chart-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+                        gap: 24px;
+                        margin: 30px 0;
+                    }
+                    @media (max-width: 768px) {
+                        .chart-grid { grid-template-columns: 1fr; }
+                    }
+                    .chart-card {
+                        background: white;
+                        border-radius: 12px;
+                        padding: 24px;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+                        transition: transform 0.2s;
+                    }
+                    .chart-card:hover {
+                        transform: translateY(-4px);
+                        box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+                    }
+                    .chart-card h3 {
+                        margin: 0 0 16px 0;
+                        color: #2c3e50;
+                        font-size: 18px;
+                        font-weight: 600;
+                    }
+                    .chart-card img {
+                        width: 100%;
+                        height: auto;
+                        border-radius: 8px;
+                        cursor: pointer;
+                    }
+                    .dark .chart-card { background: #313131; }
+                    .dark .chart-card h3 { color: #fff; }
+                </style>
+                <h2>Analysis Visualizations</h2>
+                <div class="chart-grid" id="chartGrid"></div>
+            `);
+
+            // Display all PNG files
+            pngFiles.forEach(file => {
+                const imagePath = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${file.path}`;
+                const fileName = file.path.split('/').pop().replace('.png', '').replace(/_/g, ' ');
+                const title = fileName.charAt(0).toUpperCase() + fileName.slice(1);
+                
+                const chartHTML = `
+                    <div class="chart-card">
+                        <h3>${title}</h3>
+                        <a href="${imagePath}" target="_blank">
+                            <img src="${imagePath}" alt="${title}" loading="lazy">
+                        </a>
+                    </div>
+                `;
+                $('#chartGrid').append(chartHTML);
+            });
+        },
+        error: function(err) {
+            console.error('Error fetching from GitHub:', err);
+            $('#exploreOutput').append('<p style="color:red;">Error loading charts. Check console for details.</p>');
+        }
+    });
+}
